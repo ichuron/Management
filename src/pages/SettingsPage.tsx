@@ -3,9 +3,10 @@ import { useAuth } from '../auth/AuthProvider'
 import { Card, PageTitle } from '../components/ui'
 import { formatYen } from '../lib/money'
 import { applyTheme, loadTheme } from '../lib/theme'
-import { useTable } from '../lib/useTable'
-import { ACCOUNT_KIND_LABEL, CATEGORY_GROUP_LABEL, type Account, type Budget, type Category, type CategoryGroup, type Settings, type Theme } from '../lib/types'
+import { useData } from '../lib/data'
+import { ACCOUNT_KIND_LABEL, CATEGORY_GROUP_LABEL, type CategoryGroup, type Template, type Theme } from '../lib/types'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/Toast'
 
 const THEMES: { value: Theme; label: string }[] = [
   { value: 'system', label: '端末に合わせる' },
@@ -15,13 +16,10 @@ const THEMES: { value: Theme; label: string }[] = [
 
 export function SettingsPage() {
   const { session, signOut } = useAuth()
-  const categories = useTable<Category>('categories')
-  const budgets = useTable<Budget>('budgets', 'created_at')
-  const accounts = useTable<Account>('accounts')
-  const settings = useTable<Settings>('settings', 'created_at')
+  const { categories, budgets, accounts, settings: saved, templates, reloadMaster } = useData()
+  const toast = useToast()
   const [theme, setTheme] = useState<Theme>(loadTheme)
 
-  const saved = settings.rows[0]
   // 別の端末で変えたテーマを反映する
   useEffect(() => {
     if (saved) {
@@ -36,24 +34,28 @@ export function SettingsPage() {
     if (saved && supabase) await supabase.from('settings').update({ theme: t }).eq('id', saved.id)
   }
 
-  const defaultBudget = new Map(budgets.rows.filter((b) => b.month === null).map((b) => [b.category_id, b.amount]))
+  async function deleteTemplate(t: Template) {
+    if (!supabase || !window.confirm(`テンプレート「${t.name}」を削除しますか？`)) return
+    const { error: err } = await supabase.from('templates').delete().eq('id', t.id)
+    if (err) {
+      toast(`削除できませんでした：${err.message}`)
+      return
+    }
+    await reloadMaster()
+    toast(`テンプレート「${t.name}」を削除しました`)
+  }
+
+  const defaultBudget = new Map(budgets.filter((b) => b.month === null).map((b) => [b.category_id, b.amount]))
   const groups: CategoryGroup[] = ['fixed', 'living', 'income']
-  const error = categories.error ?? budgets.error ?? accounts.error ?? settings.error
 
   return (
     <>
       <PageTitle>設定</PageTitle>
-      {error && (
-        <p role="alert" className="mb-4 text-sm text-red-700 dark:text-red-400">
-          ⚠ 読み込みに失敗しました：{error}
-        </p>
-      )}
-
       <div className="grid gap-x-4 lg:grid-cols-2">
         <div>
           <Card title="カテゴリと月の予算">
             {groups.map((g) => {
-              const list = categories.rows.filter((c) => c.grp === g && !c.archived)
+              const list = categories.filter((c) => c.grp === g && !c.archived)
               const total = list.reduce((sum, c) => sum + (defaultBudget.get(c.id) ?? 0), 0)
               return (
                 <div key={g} className="mb-3 last:mb-0">
@@ -83,10 +85,13 @@ export function SettingsPage() {
         <div>
           <Card title="口座">
             <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
-              {accounts.rows.map((a) => (
-                <li key={a.id} className="flex justify-between py-1.5">
-                  <span>{a.name}</span>
-                  <span className="text-slate-500 dark:text-slate-400">{ACCOUNT_KIND_LABEL[a.kind]}</span>
+              {accounts.map((a) => (
+                <li key={a.id} className="flex justify-between gap-2 py-1.5">
+                  <span>
+                    {a.name}
+                    {a.is_savings && <span className="ml-2 rounded bg-teal-50 px-1.5 text-xs text-teal-800 dark:bg-teal-950 dark:text-teal-300">貯蓄・投資</span>}
+                  </span>
+                  {a.name !== ACCOUNT_KIND_LABEL[a.kind] && <span className="text-slate-500 dark:text-slate-400">{ACCOUNT_KIND_LABEL[a.kind]}</span>}
                 </li>
               ))}
             </ul>
@@ -97,10 +102,39 @@ export function SettingsPage() {
               {(saved?.payment_methods ?? []).map((p) => (
                 <li key={p.name} className="flex justify-between py-1.5">
                   <span>{p.name}</span>
-                  <span className="text-slate-500 dark:text-slate-400">{accounts.rows.find((a) => a.id === p.account_id)?.name ?? '—'} から</span>
+                  <span className="text-slate-500 dark:text-slate-400">{accounts.find((a) => a.id === p.account_id)?.name ?? '—'} から</span>
                 </li>
               ))}
             </ul>
+          </Card>
+
+          <Card title="テンプレート（よく使う記録）">
+            {templates.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">入力シートの「⚡ テンプレートに保存」で追加できます。</p>
+            ) : (
+              <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+                {templates.map((t) => {
+                  const c = categories.find((x) => x.id === t.category_id)
+                  return (
+                    <li key={t.id} className="flex items-center justify-between gap-2 py-1.5">
+                      <span className="min-w-0 truncate">
+                        <span aria-hidden className="mr-2">{c?.icon}</span>
+                        {t.name}
+                        <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                          {[c?.name, t.payment_method].filter(Boolean).join('・')}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="tabular">{formatYen(t.amount)}</span>
+                        <button type="button" onClick={() => deleteTemplate(t)} aria-label={`${t.name}を削除`} className="rounded px-2 py-1 text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950">
+                          削除
+                        </button>
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </Card>
 
           <Card title="テーマ">

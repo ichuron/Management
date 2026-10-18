@@ -9,7 +9,7 @@
 ## 進み具合
 
 - [x] Phase 1：土台（ログイン、RLS付きテーブル、初期データ、画面の枠）
-- [ ] Phase 2：家計簿
+- [x] Phase 2：家計簿（カレンダー、入力シート、テンプレート、連続入力、編集・削除・元に戻す、端末間の即時反映）
 - [ ] Phase 3：実績
 - [ ] Phase 4：資産
 - [ ] Phase 5：仕上げ（定期記録、PWA、バックアップ、デプロイ）
@@ -19,7 +19,9 @@
 ### 1. Supabase プロジェクトを作る
 
 1. https://supabase.com で新しいプロジェクトを作る（リージョンは Tokyo がおすすめ）。
-2. **SQL Editor** を開き、[`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql) の中身を貼り付けて **Run**。
+2. **SQL Editor** を開き、[`supabase/migrations/`](./supabase/migrations/) の SQL を番号順に1つずつ貼り付けて **Run**。
+   - `0001_init.sql`：テーブル・RLS・初期データ
+   - `0002_kakeibo.sql`：貯蓄口座の印、記録の即時反映（Realtime）
 3. **Authentication → Users → Add user → Create new user** で自分のメールアドレスとパスワードを登録する（「Auto Confirm User」にチェック）。
 4. **Authentication → Sign In / Providers**（Settings）で **「Allow new users to sign up」をオフ** にする。これで他人は登録できない。
 5. **Project Settings → API** から `Project URL` と `anon public` キーを控える。
@@ -41,6 +43,14 @@ npm run dev                  # http://localhost:5173
 npm test          # 計算ロジック（Vitest）
 npm run build     # 型チェック＋本番ビルド
 ```
+
+## 使い方のメモ
+
+- 「＋ 記録」はどの画面からでも開ける。家計簿タブで日付を選んでいれば、その日が初期値になる。
+- 入力シートの「⚡」はテンプレート。タップするとその場で記録される（直後の「取り消す」で戻せる）。
+- 「連続入力」にチェックすると、保存してもシートが閉じない（レシートをまとめて入れるとき用）。
+- PC では数字キー・Backspace・Enter でも入力できる。
+- カレンダーの色は「生活費の1日あたり予算」との比較。予算を超えた日は金額の前に「!」が付く。
 
 ## 安全のための設定
 

@@ -1,6 +1,9 @@
 import { NavLink, Outlet } from 'react-router'
 import type { ReactNode } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import { DataProvider, useData } from '../lib/data'
+import { EntryProvider, useEntry } from './EntrySheet'
+import { ToastProvider } from './Toast'
 import { CalendarIcon, ChartIcon, GearIcon, WalletIcon } from './Icons'
 
 const TABS: { to: string; label: string; icon: ReactNode }[] = [
@@ -12,6 +15,29 @@ const TABS: { to: string; label: string; icon: ReactNode }[] = [
 
 export function Layout() {
   const { dataReady, seedError } = useAuth()
+  if (seedError) {
+    return (
+      <p role="alert" className="m-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+        ⚠ 初期データの準備に失敗しました：{seedError}
+      </p>
+    )
+  }
+  // 初期データの用意が終わってからデータを読み込む
+  if (!dataReady) return <p className="py-12 text-center text-slate-500">読み込み中…</p>
+  return (
+    <DataProvider>
+      <ToastProvider>
+        <EntryProvider>
+          <Shell />
+        </EntryProvider>
+      </ToastProvider>
+    </DataProvider>
+  )
+}
+
+function Shell() {
+  const { masterLoading, error } = useData()
+  const { openNew } = useEntry()
 
   return (
     <div className="flex min-h-full">
@@ -41,20 +67,21 @@ export function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-4 pb-28 lg:px-8 lg:pt-8 lg:pb-12">
-          {seedError && (
+          {error && (
             <p role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-              ⚠ 初期データの準備に失敗しました：{seedError}
+              ⚠ {error}
             </p>
           )}
-          {dataReady ? <Outlet /> : <p className="py-12 text-center text-slate-500">読み込み中…</p>}
+          {masterLoading ? <p className="py-12 text-center text-slate-500">読み込み中…</p> : <Outlet />}
         </main>
       </div>
 
-      {/* 全画面共通：右下の「＋ 記録」ボタン（入力シートは Phase 2 で実装） */}
+      {/* 全画面共通：右下の「＋ 記録」ボタン */}
       <button
         type="button"
         className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 flex items-center gap-1 rounded-full bg-teal-600 px-5 py-3.5 text-base font-bold text-white shadow-lg hover:bg-teal-700 active:scale-95 lg:right-8 lg:bottom-8 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
-        onClick={() => alert('入力シートは Phase 2 で作ります')}
+        onClick={() => openNew()}
+        aria-label="記録する"
       >
         <span aria-hidden className="text-xl leading-none">＋</span> 記録
       </button>

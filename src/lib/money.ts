@@ -16,3 +16,15 @@ export function formatYen(n: number): string {
 export function formatBasisPercent(bp: number): string {
   return `${(bp / 100).toFixed(bp % 100 === 0 ? 0 : 2)}%`
 }
+
+/** カレンダーのマス用の短い表記。10万円未満は 12,345、以上は 12.3万（切り捨て） */
+export function formatCompact(n: number): string {
+  assertYen(n)
+  const abs = Math.abs(n)
+  const sign = n < 0 ? '-' : ''
+  if (abs < 100_000) return sign + yenFormatter.format(abs)
+  const tenths = Math.floor(abs / 1000)
+  const whole = Math.floor(tenths / 10)
+  const frac = tenths % 10
+  return `${sign}${yenFormatter.format(whole)}${frac ? `.${frac}` : ''}万`
+}

@@ -10,6 +10,8 @@ export interface Account {
   opening_date: string | null
   sort: number
   archived: boolean
+  /** 貯蓄・投資の口座（ここへの振替を「貯蓄・投資に回した額」に数える） */
+  is_savings: boolean
 }
 
 export interface Category {
@@ -27,6 +29,57 @@ export interface Budget {
   category_id: string
   month: string | null
   amount: number
+}
+
+export type TxType = 'expense' | 'income' | 'transfer' | 'adjustment'
+
+export interface Transaction {
+  id: string
+  date: string
+  type: TxType
+  amount: number
+  category_id: string | null
+  from_account_id: string | null
+  to_account_id: string | null
+  payment_method: string | null
+  memo: string
+  recurring_rule_id: string | null
+  planned_expense_id: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface RecurringRule {
+  id: string
+  type: 'expense' | 'income' | 'transfer'
+  amount: number
+  category_id: string | null
+  from_account_id: string | null
+  to_account_id: string | null
+  payment_method: string | null
+  day_of_month: number
+  start_month: string
+  end_month: string | null
+  active: boolean
+  memo: string
+}
+
+export interface Template {
+  id: string
+  name: string
+  type: 'expense' | 'income' | 'transfer'
+  amount: number
+  category_id: string | null
+  payment_method: string | null
+  memo: string
+  sort: number
+}
+
+export const TX_TYPE_LABEL: Record<TxType, string> = {
+  expense: '支出',
+  income: '収入',
+  transfer: '振替',
+  adjustment: '残高調整',
 }
 
 export interface PaymentMethod {
